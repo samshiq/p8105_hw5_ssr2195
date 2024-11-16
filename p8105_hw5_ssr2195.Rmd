@@ -53,16 +53,21 @@ sim_res =
 
 # Plot probability as a function of group size
 sim_res |> 
-  ggplot(aes(x = n, y = prob )) + 
-  geom_line()
-```
+  ggplot(aes(x = n, y = prob)) + 
+  geom_line() +
+  labs(
+    title = "Probability of Shared Birthday vs. Group Size",
+    x = "Group Size (n)",
+    y = "Probability of Shared Birthday"
+  ) +
+  theme_minimal()
 
+```
 
 As group size increases, the probability that two people in the group share the same birthday increases as well. 
 
 ## Problem 2
-```{r}
-
+```{r problem_2.1}
 # Set seed for reproducibility
 set.seed(1738)
 
@@ -84,10 +89,11 @@ t_test_results <- datasets %>%
     mu_hat = map_dbl(data, mean),                            
     p_value = map_dbl(data, ~ t.test(.x, mu = 0)$p.value)
   )
-
 ```
 
-```{r}
+
+#### Power Plot
+```{r problem_2.2}
 # Calculate power for each true mean
 power_results <- t_test_results %>%
   group_by(true_mean) %>%
@@ -108,6 +114,7 @@ print(plot_power)
 
 ```
 
+#### Average Estimate vs. True Mean Plot
 ```{r}
 # Calculate average mu_hat for all datasets
 average_mu_results <- t_test_results %>%
@@ -162,13 +169,12 @@ print(plot_combined)
 
 No, the sample average of mu-hat from rejected tests is not approximately equal to the true value of mu, especially when mu is small. This is because we only reject the null hypothesis when the estimate mu-hat is more extreme, which leads to a higher average for rejected samples.
 
-However, as mu gets larger, the rejected-samples average (blue line) approaches the true value (black line) because we are rejecting the null hypothesis more frequently. This means we’re including nearly all samples, not just the extreme ones, which reduces the bias.
+However, as mu gets larger, the rejected-samples average approaches the true value because we are rejecting the null hypothesis more frequently. This means we’re including nearly all samples, not just the extreme ones, which reduces the bias.
 
 
 
 ## Problem 3
 ```{r }
-
 homicide_dta <- 
   read_csv("homicide-data.csv") 
 
@@ -178,6 +184,15 @@ homicide_dta <- homicide_dta |>
   mutate(city_state = str_c(city, ", ", state)) |>
   mutate(reported_date = as.character(reported_date)) |>
   mutate(reported_date = as.Date(reported_date, format = "%Y%m%d"))
+
+# Reassign Tulsa, AL (does not exist) to Tulsa, OK
+homicide_dta <- homicide_dta |> 
+  mutate(
+    city_state = case_when(
+      city_state == "Tulsa, AL" ~ "Tulsa, OK", 
+      TRUE ~ city_state
+    )
+  )
 
 # Summarize homicides
 summary <- homicide_dta |>
@@ -198,8 +213,6 @@ This publicly-available dataset from the Washington Post contains homicide
 data from cities in the US. The dataset contains `r nrow(homicide_dta)` homicide cases and has `r ncol(homicide_dta)` columns, with variables including victim name, age, race, sex, and disposition of the case. It contains data from `r homicide_dta %>% pull(city_state) %>% unique() %>% length()` cities.
 
 ```{r}
-
-
 # Filter for Baltimore cases
 baltimore <- homicide_dta |> 
   filter(city_state == "Baltimore, MD")
@@ -228,16 +241,6 @@ print(baltimore_prop_test_summary)
 ```
 
 ```{r}
-
-# Reassign Tulsa, AL (does not exist) to Tulsa, OK
-homicide_dta <- homicide_dta |> 
-  mutate(
-    city_state = case_when(
-      city_state == "Tulsa, AL" ~ "Tulsa, OK", 
-      TRUE ~ city_state
-    )
-  )
-
 # Summarize total/unsolved cases by city
 city_data <- homicide_dta |> 
   group_by(city_state) |> 
@@ -265,9 +268,8 @@ city_results
 
 ```
 
+#### Proportion of Unsolved Homicides by City Plot
 ```{r}
-library(ggplot2)
-
 # Plot the results
 city_results |> 
   mutate(city_state = reorder(city_state, estimate)) |>
@@ -284,7 +286,6 @@ city_results |>
   theme(
     axis.text.y = element_text(size = 6)  # Adjust text size for city labels
   )
-
 ```
 
 
