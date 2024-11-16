@@ -128,12 +128,12 @@ combined_results <- average_mu_results %>%
 
 # Plot average mu_hat vs true mean
 plot_avg_mu <- ggplot(average_mu_results, aes(x = true_mean, y = avg_mu_hat)) +
-  geom_line(color = "deeppink", size = 1) +  # Add deep pink to the line
-  geom_point(color = "deeppink", size = 2) +  # Add deep pink to the points
+  geom_line(color = "deeppink", size = 1) +
+  geom_point(color = "deeppink", size = 2) +
   labs(
-    title = "Average Estimate of Mu vs True Mean",
+    title = "Average Estimate of Mu vs. True Mean",
     x = "True Mean (mu)",
-    y = "Average Estimate of mu"
+    y = "Average Estimate of Mu"
   ) +
   theme_minimal()
 
@@ -148,9 +148,9 @@ plot_combined <- ggplot(combined_results, aes(x = true_mean)) +
   geom_point(aes(y = avg_mu_rejected, color = "Rejected Samples")) +
   scale_color_manual(values = c("Overall Average" = "deeppink", "Rejected Samples" = "hotpink")) +
   labs(
-    title = "Average Estimate of mû vs True Mean",
+    title = "Average Estimate of Mu vs True Mean",
     x = "True Mean (mu)",
-    y = "Average Estimate of mû",
+    y = "Average Estimate of Mu",
     color = "Legend"
   ) +
   theme_minimal()
@@ -169,7 +169,125 @@ However, as mu gets larger, the rejected-samples average (blue line) approaches 
 ## Problem 3
 ```{r }
 
+homicide_dta <- 
+  read_csv("homicide-data.csv") 
+
+
+# Create city_state variable and convert reported_date
+homicide_dta <- homicide_dta |>
+  mutate(city_state = str_c(city, ", ", state)) |>
+  mutate(reported_date = as.character(reported_date)) |>
+  mutate(reported_date = as.Date(reported_date, format = "%Y%m%d"))
+
+# Summarize homicides
+summary <- homicide_dta |>
+  group_by(city_state) |>
+  summarise(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest")),
+    solved_homicides = sum(disposition == "Closed by arrest")
+  )
+
+# View summary
+print(summary)
+
+
 ```
+
+This publicly-available dataset from the Washington Post contains homicide
+data from cities in the US. The dataset contains `r nrow(homicide_dta)` homicide cases and has `r ncol(homicide_dta)` columns, with variables including victim name, age, race, sex, and disposition of the case. It contains data from `r homicide_dta %>% pull(city_state) %>% unique() %>% length()` cities.
+
+```{r}
+
+
+# Filter for Baltimore cases
+baltimore <- homicide_dta |> 
+  filter(city_state == "Baltimore, MD")
+
+# Count number unsolved/total homicides
+total_cases <- nrow(baltimore)
+unsolved_cases <- baltimore |> 
+  filter(disposition == "Open/No arrest") |>  
+  nrow()
+
+# Perform the prop test
+baltimore_prop_test <- prop.test(
+  x = unsolved_cases, 
+  n = total_cases,
+  alternative = "two.sided"
+)
+
+# Tidy result and extract proportion and CI's
+baltimore_prop_test_summary <- baltimore_prop_test |> 
+  tidy() |> 
+  select(estimate, conf.low, conf.high)
+
+print(baltimore_prop_test_summary)
+
+
+```
+
+```{r}
+
+# Reassign Tulsa, AL (does not exist) to Tulsa, OK
+homicide_dta <- homicide_dta |> 
+  mutate(
+    city_state = case_when(
+      city_state == "Tulsa, AL" ~ "Tulsa, OK", 
+      TRUE ~ city_state
+    )
+  )
+
+# Summarize total/unsolved cases by city
+city_data <- homicide_dta |> 
+  group_by(city_state) |> 
+  summarise(
+    total_cases = n(),
+    unsolved_cases = sum(disposition == "Open/No arrest"),
+    .groups = "drop"
+  )
+
+# Run prop.test for each city
+city_results <- city_data |> 
+  mutate(
+    prop_test_result = map2(
+      unsolved_cases, 
+      total_cases, 
+      ~ prop.test(x = .x, n = .y, alternative = "two.sided")
+    ),
+    tidy_result = map(prop_test_result, tidy)
+  ) |> 
+  unnest(tidy_result) |>
+  select(city_state, estimate, conf.low, conf.high)
+
+# View results
+city_results
+
+```
+
+```{r}
+library(ggplot2)
+
+# Plot the results
+city_results |> 
+  mutate(city_state = reorder(city_state, estimate)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
+  coord_flip() +
+  labs(
+    title = "Proportion of Unsolved Homicides by City",
+    x = "City",
+    y = "Proportion of Unsolved Homicides (95% CI)",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 6)  # Adjust text size for city labels
+  )
+
+```
+
+
 
 
 
